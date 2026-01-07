@@ -30,22 +30,13 @@ class YOLOPv2RKNN:
              [(36,75), (76,55), (72,146)],       # stride 16 -> 40x40
              [(142,110), (192,243), (459,401)],  # stride 32 -> 20x20
         ]
-#        anchors = [
-##            [12, 16, 19, 36, 40, 28],
-#            [36, 75, 76, 55, 72, 146],
-#            [142, 110, 192, 243, 459, 401],
-#        ]
         self.na = len(self.anchors[0]) // 2
         self.no = self.num_class + 5
         self.stride = [8, 16, 32]
         self.nl = len(self.stride)
-
-        # (nl=3, na=3, 1, 1, 2)
-        #self.anchors = np.asarray(anchors, dtype=np.float32).reshape(3, 3, 1, 1, 2)
         self.anchors = [np.array(a, np.float32).reshape(1,3,1,1,2) for a in self.anchors]
 
         # Precompute grids at 640 for each stride
-        #self.grid = []
         # This runs once in __init__
         self.grid = [self._make_grid(nx, ny) for nx, ny in [(80, 80), (40, 40), (20, 20)]]
         for i in range(self.nl):
@@ -68,18 +59,9 @@ class YOLOPv2RKNN:
         except Exception:
             pass
 
-#    def _make_grid(self, nx=20, ny=20):
-##        # matches the ONNX demo's grid:
-#        xv, yv = np.meshgrid(np.arange(nx), np.arange(ny))
-#        return np.stack((xv, yv), 2).reshape(1, 1, ny, nx, 2).astype(np.float32)
-
     def _make_grid(self, nx, ny):
         xv, yv = np.meshgrid(np.arange(nx), np.arange(ny))
         return np.stack((xv, yv), 2).reshape(1,1,ny,nx,2).astype(np.float32)
-
-    # def _make_grid(self, nx, ny):
-    #     xv, yv = np.meshgrid(np.arange(nx), np.arange(ny))
-    #     return np.stack((xv, yv), 2).reshape(1, 1, ny, nx, 2).astype(np.float32)
 
     def drawPred(self, frame, classId, conf, left, top, right, bottom):
         cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), thickness=2)
@@ -105,7 +87,6 @@ class YOLOPv2RKNN:
         input_image = input_image.transpose(2, 0, 1)                # CHW
         input_image = np.expand_dims(input_image, axis=0).astype(np.uint8)  # NCHW uint8
 
-        #self.grid = [self._make_grid(nx, ny) for nx, ny in [(80, 80), (40, 40), (20, 20)]]
         # --- Inference ---
         # Expected outs:
         # results[0] drivable (1,2,640,640)
@@ -119,9 +100,6 @@ class YOLOPv2RKNN:
             a = np.array(o)
             print(k, a.shape, a.dtype)
 
-        #heads = [np.array(results[2]), np.array(results[3]), np.array(results[4])]
-        #heads_sorted = sorted(heads, key=lambda x: x.shape[2], reverse=True)
-
         # --- Detection decode (ported from your ONNX demo) ---
         z = []
         for i in range(3):
@@ -130,29 +108,13 @@ class YOLOPv2RKNN:
 
             y = head.reshape(bs, 3, 5 + self.num_class, ny, nx).transpose(0, 1, 3, 4, 2)
             y = self._sigmoid(y)
-            #self.grid = [self._make_grid(nx, ny) for nx, ny in [(80, 80), (40, 40), (20, 20)]]
-            #self.grid = self._make_grid(nx, ny)                # build correct grid for this head
             y[..., 0:2] = (y[..., 0:2] * 2.0 - 0.5 + self.grid[i]) * self.stride[i]
             y[..., 2:4] = (y[..., 2:4] * 2.0) ** 2 * self.anchors[i]
 
             z.append(y.reshape(bs, -1, 5 + self.num_class))
 
         det_out = np.concatenate(z, axis=1).squeeze(axis=0)
-#            head = np.array(results[i + 2])  # (bs,255,ny,nx)
-#            bs, _, ny, nx = head.shape
-#            y = head.reshape(bs, 3, 5 + self.num_class, ny, nx).transpose(0, 1, 3, 4, 2)
-#            y = self._sigmoid(y)
-##            y[..., 0:2] = (y[..., 0:2] * 2.0 - 0.5 + self.grid[i]) * self.stride[i]   # xy
-#            y[..., 2:4] = (y[..., 2:4] * 2.0) ** 2 * self.anchors[i]                  # wh
-#            z.append(y.reshape(bs, -1, 5 + self.num_class))
-
-#        det_out = np.concatenate(z, axis=1).squeeze(axis=0)  # (N,85)
-# right after you compute det_out
-        xywh = det_out[:, :4]
-        print("cx min/max:", xywh[:,0].min(), xywh[:,0].max())
-        print("cy min/max:", xywh[:,1].min(), xywh[:,1].max())
-        print("w  p50/p95:", np.percentile(xywh[:,2], [50,95]))
-        print("h  p50/p95:", np.percentile(xywh[:,3], [50,95]))
+        
         boxes, confidences, classIds = [], [], []
         for i in range(det_out.shape[0]):
             obj = det_out[i, 4]
@@ -181,13 +143,6 @@ class YOLOPv2RKNN:
                 left, top, width, height = boxes[i]
                 self.drawPred(frame_bgr, classIds[i], confidences[i],
                               left, top, left + width, top + height)
-#            idxs = np.array(idxs).reshape(-1).tolist()
-#            for j in idxs:
-#                left, top, width, height = boxes[j]
-#                frame_bgr = self.drawPred(frame_bgr, classIds[j], confidences[j],
-#                                          left, top, left + width, top + height)
-
-        cv2.imwrite("DEBUG_frame_after_boxes.png", frame_bgr.copy())
 
         # --- Drivable Area Segmentation (same as ONNX demo) ---
         drivable_area = np.squeeze(np.array(results[0]), axis=0)  # (2,640,640)
@@ -195,21 +150,12 @@ class YOLOPv2RKNN:
         mask = cv2.resize(mask, (image_width, image_height), interpolation=cv2.INTER_NEAREST)
         frame_bgr[mask == 1] = [0, 255, 0]
         
-        # After drivable overlay:
-        tmp = frame_bgr.copy()
-        tmp[mask == 1] = [0,255,0]
-        cv2.imwrite("DEBUG_after_drivable.png", tmp)
-
         # --- Lane Line (same as ONNX demo) ---
         lane_line = np.squeeze(np.array(results[1]))  # (640,640)
         lane_mask = np.where(lane_line > 0.5, 1, 0).astype(np.uint8)
         lane_mask = cv2.resize(lane_mask, (image_width, image_height), interpolation=cv2.INTER_NEAREST)
         frame_bgr[lane_mask == 1] = [255, 0, 0]
 
-        # After lane overlay:
-        tmp2 = tmp.copy()
-        tmp2[lane_mask == 1] = [255,0,0]
-        cv2.imwrite("DEBUG_after_lane.png", tmp2)
 
         return frame_bgr
 

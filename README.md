@@ -46,6 +46,13 @@ outputs = rknn.inference(inputs=[input_image], data_format=['nchw'])
 ```
 RKNN defaults to the 'nhcw' format which resolves odd results.
 
+# Inference on RKNN 
+To run, do:
+```bash
+python demo_yolopv2_rknn.py --rknn yolopv2_unwrapped_int8.rknn --img data/example.jpg --conf 0.5 --out out.jpg
+```
+
+
 ## Results
 We used the BDD100K as our datasets,and experiments are run on **NVIDIA TESLA V100**.
 
