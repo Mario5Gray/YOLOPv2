@@ -28,6 +28,24 @@ The advantages of **YOLOPv2** can be summaried as below:
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/yolopv2-better-faster-stronger-for-panoptic/drivable-area-detection-on-bdd100k)](https://paperswithcode.com/sota/drivable-area-detection-on-bdd100k?p=yolopv2-better-faster-stronger-for-panoptic)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/yolopv2-better-faster-stronger-for-panoptic/lane-detection-on-bdd100k)](https://paperswithcode.com/sota/lane-detection-on-bdd100k?p=yolopv2-better-faster-stronger-for-panoptic)
 
+### 🚀 New: Rockchip NPU (RKNN) Support
+
+YOLOPv2 now runs on **Rockchip NPUs** (e.g., RK3588 / RK3568) using **RKNN Toolkit / RKNN-Lite**.  
+The ONNX model can be converted to `.rknn`, and inference runs fully on the NPU — including detection, drivable-area segmentation, and lane detection.
+
+We provide an example demo showing:
+
+- 🔌 Loading the RKNN model with `rknn-toolkit-lite2`  
+- 📐 Correct preprocessing in **NCHW** layout  
+- 🎯 Decoding detections with YOLOPv2 anchors and grids  
+- 🏎️ Fast panoptic perception on Rockchip hardware  
+
+> **Note:** when calling inference, be sure to specify the input layout explicitly:
+```python
+outputs = rknn.inference(inputs=[input_image], data_format=['nchw'])
+```
+RKNN defaults to the 'nhcw' format which resolves odd results.
+
 ## Results
 We used the BDD100K as our datasets,and experiments are run on **NVIDIA TESLA V100**.
 
