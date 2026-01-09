@@ -1,9 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-import argparse
 import cv2
-import time
 import numpy as np
 from rknnlite.api import RKNNLite
 
@@ -84,15 +79,16 @@ class YOLOPv2RKNN:
         # --- Preprocess (match your RKNN build: feed uint8 0..255) ---
         input_image = cv2.resize(frame_bgr, dsize=(self.input_width, self.input_height))
         input_image = cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)
-        input_image = input_image.transpose(2, 0, 1)                # CHW
-        input_image = np.expand_dims(input_image, axis=0).astype(np.uint8)  # NCHW uint8
-
+        input_image = np.expand_dims(input_image, axis=0).astype(np.uint8) #NHWC
+        #input_image = input_image.transpose(2, 0, 1)                # CHW
+        #input_image = np.expand_dims(input_image, axis=0).astype(np.uint8)  # NCHW uint8
+        assert input_image.shape == (1, self.input_height, self.input_width, 3), "RKNN expects NHWC uint8"
         # --- Inference ---
         # Expected outs:
         # results[0] drivable (1,2,640,640)
         # results[1] lane     (1,1,640,640)
         # results[2:5] det heads (1,255,80/40/20,80/40/20)
-        results = self.rknn.inference(inputs=[input_image], data_format=['nchw'])
+        results = self.rknn.inference(inputs=[input_image], data_format=['nhwc'])
         assert results[2].shape[2:] == (80,80)
         assert results[3].shape[2:] == (40,40)
         assert results[4].shape[2:] == (20,20)        
@@ -158,56 +154,3 @@ class YOLOPv2RKNN:
 
 
         return frame_bgr
-
-import cv2
-import time
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--rknn", required=True, help="path to .rknn")
-    parser.add_argument("--vid", required=True, help="path to image")
-    parser.add_argument("--conf", default=0.5, type=float, help="confidence threshold")
-    parser.add_argument("--out", default="out_rknn.png", help="output image")
-    args = parser.parse_args()
-
-    net = YOLOPv2RKNN(args.rknn, confThreshold=args.conf)
-    # --- Setup input video stream ---
-    cap = cv2.VideoCapture(args.vid)   # Or 0 for webcam
-    if not cap.isOpened():
-        print("Error: Cannot open video.")
-        return
-
-    # --- Optional: setup output writer ---
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    height, width = (1920,1080)
-    out_writer = cv2.VideoWriter(args.out, fourcc, 30.0, (height, width))  # Adjust resolution/fps if needed
-
-    # --- Loop over frames ---
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break  # End of video
-
-        start = time.time()
-        out_frame = net.detect(frame)
-        fps = 1.0 / (time.time() - start)
-
-        # Optional FPS overlay
-        cv2.putText(out_frame, f"FPS: {fps:.2f}", (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
-
-        #cv2.imshow("YOLOPv2 RKNN", out_frame)
-        out_writer.write(out_frame)
-
-        # Exit key
-        #if cv2.waitKey(1) & 0xFF == ord('q'):
-        #    break
-
-    # --- Cleanup ---
-    cap.release()
-    out_writer.release()
-    #cv2.destroyAllWindows()
-
-
-if __name__ == "__main__":
-    main()
