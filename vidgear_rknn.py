@@ -54,24 +54,23 @@ def main():
     out_frame = net.detect(frame)
     writer.write(out_frame)
 
+    # --- timing helpers ---
+    infer_ms_window = deque(maxlen=30)
+    loop_ms_window  = deque(maxlen=30)
+
+    infer_ms_total = 0.0
+    loop_ms_total  = 0.0
+    n_frames = 0
+
+    # If you want higher-resolution timing on Linux:
+    now = time.perf_counter  # monotonic, high-res
+
     # Loop over frames
     while True:
         frame = stream.read()  # VidGear returns just frame, not (ret, frame)
         
         if frame is None:  # Changed from 'if not frame'
             break
-
-
-        # --- timing helpers ---
-        infer_ms_window = deque(maxlen=30)
-        loop_ms_window  = deque(maxlen=30)
-
-        infer_ms_total = 0.0
-        loop_ms_total  = 0.0
-        n_frames = 0
-
-        # If you want higher-resolution timing on Linux:
-        now = time.perf_counter  # monotonic, high-res
 
         t_loop0 = now()
         start = time.time()
@@ -109,7 +108,7 @@ def main():
         n_frames += 1
 
         # Optional: print every N frames
-        if n_frames % 60 == 0:
+        if n_frames % 5 == 0:
             loop_ms_avg = float(np.mean(loop_ms_window))
             print(f"[{n_frames}] infer={infer_ms_avg:.2f}ms avg30, loop={loop_ms_avg:.2f}ms avg30")
 
